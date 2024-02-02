@@ -1,0 +1,8 @@
+[workspace.package]
+edition = "2021"
+
+[workspace]
+members = ["crates/*"]
+
+[workspace.dependencies]
+tokio = { version = "1.35.1", features = ["full"] }

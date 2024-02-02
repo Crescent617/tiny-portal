@@ -1,0 +1,13 @@
+[package]
+name = "tiny-portal"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.79"
+log = "0.4.20"
+smallstr = "0.3.0"
+smol_str = "0.2.1"
+tokio = { version = "1", features = ["full"] }
