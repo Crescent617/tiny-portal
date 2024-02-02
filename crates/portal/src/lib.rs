@@ -119,12 +119,15 @@ impl PortForwarder {
 
                             tokio::spawn(async move {
                                 let mut b2 = [0u8; MAX_UDP_PACKET_SIZE];
-
-                                while let Ok((size, _)) = fw_sock.recv_from(&mut b2).await {
-                                    log::debug!("Forwarding {} bytes to {}", size, client_addr);
-                                   if let Err(e)= sock.send_to(&b2[..size], client_addr).await {
-                                        log::error!("Error sending to socket: {}", e);
+                                if let Ok(r) = timeout(Duration::from_secs(5), fw_sock.recv_from(&mut b2)).await {
+                                    if let Ok((size, _)) = r {
+                                        log::debug!("Forwarding {} bytes to {}", size, client_addr);
+                                        if let Err(e) = sock.send_to(&b2[..size], client_addr).await {
+                                            log::error!("Error sending to socket: {}", e);
+                                        }
                                     }
+                                } else {
+                                    log::error!("Timeout waiting for response from {}", dst_addr);
                                 }
                             });
                         }
