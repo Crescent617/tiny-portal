@@ -12,3 +12,6 @@ tokio = { version = "1", features = ["full"] }
 log = "0.4.20"
 eframe = "0.25.0"
 egui_extras = "0.25.0"
+serde_json = "1.0.113"
+serde = "1.0.196"
+dirs = "5.0.1"

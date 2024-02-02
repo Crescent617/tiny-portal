@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 
 pub const MAX_UDP_PACKET_SIZE: usize = 65536;
 const UDP_CHECK_INTERVAL: Duration = Duration::from_secs(5);
-const DEFAULT_UDP_TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_UDP_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Debug)]
 struct UdpConn {
@@ -36,7 +36,7 @@ impl UdpConn {
             while let Ok((size, _)) = forward_sock_clone.recv_from(&mut b2).await {
                 Self::update_activity(last_activity_clone.clone()).await;
 
-                log::debug!("Forwarding {} bytes to {}", size, client_addr);
+                log::info!("Forwarding {} bytes to {}", size, client_addr);
                 if let Err(e) = server_sock.send_to(&b2[..size], client_addr).await {
                     log::error!("Error sending to socket: {}", e);
                 }
@@ -112,8 +112,9 @@ impl UdpPortForwarder {
             log::info!("Starting cleanup task");
             loop {
                 tokio::time::sleep(UDP_CHECK_INTERVAL).await;
-                let n = Self::cleanup(conns.clone(), DEFAULT_UDP_TIMEOUT).await;
-                log::debug!("Cleaned up {} connections", n);
+                let n = conns.lock().await.len();
+                let k = Self::cleanup(conns.clone(), DEFAULT_UDP_TIMEOUT).await;
+                log::debug!("Cleaned up {}/{} connections", k, n);
             }
         }));
 
@@ -127,10 +128,10 @@ impl UdpPortForwarder {
 
             match sock.recv_from(&mut b1).await {
                 Ok((size, client_addr)) => {
-                    log::debug!("Received {} bytes from {}", size, client_addr);
+                    log::info!("Received {} bytes from {}", size, client_addr);
                     match self.conns.lock().await.entry(client_addr) {
                         Entry::Occupied(mut e) => {
-                            log::debug!(
+                            log::info!(
                                 "Reuse forwarding {} bytes from {} to {}",
                                 size,
                                 client_addr,
@@ -139,16 +140,14 @@ impl UdpPortForwarder {
                             e.get_mut().send(&b1[..size]).await?;
                         }
                         Entry::Vacant(e) => {
-                            log::debug!(
+                            log::info!(
                                 "New forwarding {} bytes from {} to {}",
                                 size,
                                 client_addr,
                                 dst_addr
                             );
-                            let mut conn =
-                                UdpConn::new(client_addr, dst_addr, sock.clone()).await?;
-                            conn.send(&b1[..size]).await?;
-                            e.insert(conn);
+                            let conn = UdpConn::new(client_addr, dst_addr, sock.clone()).await?;
+                            e.insert(conn).send(&b1[..size]).await?;
                         }
                     }
                 }
