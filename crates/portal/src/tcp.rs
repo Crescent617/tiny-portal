@@ -29,7 +29,7 @@ impl TcpPortForwarder {
         loop {
             match listener.accept().await {
                 Ok((client, _)) => {
-                    log::info!("Accepted connection from {}", client.peer_addr()?);
+                    log::debug!("Accepted connection from {}", client.peer_addr()?);
                     tokio::spawn(handle_tcp(client, self.dst.clone()));
                 }
                 Err(e) => log::error!("Error accepting connection: {}", e),
@@ -50,6 +50,7 @@ async fn handle_tcp(
             let client_to_target = tokio::spawn(async move { io::copy(&mut cr, &mut tw).await });
             io::copy(&mut tr, &mut cw).await?;
             let _ = client_to_target.await?;
+            log::debug!("Connection closed");
         }
         Err(e) => {
             log::error!("Error connecting to target: {}", e);

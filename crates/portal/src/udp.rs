@@ -36,7 +36,7 @@ impl UdpConn {
             while let Ok((size, _)) = forward_sock_clone.recv_from(&mut b2).await {
                 Self::update_activity(last_activity_clone.clone()).await;
 
-                log::info!("Forwarding {} bytes to {}", size, client_addr);
+                log::debug!("Forwarding {} bytes to {}", size, client_addr);
                 if let Err(e) = server_sock.send_to(&b2[..size], client_addr).await {
                     log::error!("Error sending to socket: {}", e);
                 }
@@ -128,10 +128,10 @@ impl UdpPortForwarder {
 
             match sock.recv_from(&mut b1).await {
                 Ok((size, client_addr)) => {
-                    log::info!("Received {} bytes from {}", size, client_addr);
+                    log::debug!("Received {} bytes from {}", size, client_addr);
                     match self.conns.lock().await.entry(client_addr) {
                         Entry::Occupied(mut e) => {
-                            log::info!(
+                            log::debug!(
                                 "Reuse forwarding {} bytes from {} to {}",
                                 size,
                                 client_addr,
@@ -140,7 +140,7 @@ impl UdpPortForwarder {
                             e.get_mut().send(&b1[..size]).await?;
                         }
                         Entry::Vacant(e) => {
-                            log::info!(
+                            log::debug!(
                                 "New forwarding {} bytes from {} to {}",
                                 size,
                                 client_addr,

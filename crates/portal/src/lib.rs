@@ -17,7 +17,7 @@ pub mod util {
 
             match sock.recv_from(&mut b1).await {
                 Ok((size, client_addr)) => {
-                    log::info!("Received {} bytes from {}", size, client_addr);
+                    log::debug!("Received {} bytes from {}", size, client_addr);
                     sock.send_to(&b1[..size], client_addr).await?;
                 }
                 Err(e) => log::error!("Error receiving from socket: {}", e),

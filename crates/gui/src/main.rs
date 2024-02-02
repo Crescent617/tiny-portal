@@ -2,7 +2,7 @@
 
 use eframe::egui;
 
-const CONF_CACHE: &str = ".tiny_portal_cache.json";
+const SAVE_FILE: &str = ".tiny_portal_gui.save.json";
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -11,7 +11,7 @@ fn main() -> Result<(), eframe::Error> {
         ..Default::default()
     };
     let home = dirs::home_dir().unwrap();
-    let conf_path = home.join(CONF_CACHE);
+    let conf_path = home.join(SAVE_FILE);
     let app = if conf_path.exists() {
         let conf = std::fs::read_to_string(&conf_path).unwrap();
         let app: MyApp = serde_json::from_str(&conf).unwrap();
@@ -21,7 +21,7 @@ fn main() -> Result<(), eframe::Error> {
     };
 
     eframe::run_native(
-        "My egui App",
+        "Tiny Portal GUI",
         options,
         Box::new(|_| {
             // This gives us image support:
@@ -126,8 +126,10 @@ impl eframe::App for MyApp {
 
                 if btn.clicked() {
                     if let Some(f) = self.stop_portal.take() {
+                        log::info!("Stopping port forwarder");
                         f.abort();
                     } else {
+                        log::info!("Starting port forwarder");
                         self.start();
                     }
                 }
@@ -142,7 +144,7 @@ impl Drop for MyApp {
             j.abort();
         }
         let home = dirs::home_dir().unwrap();
-        let conf_path = home.join(CONF_CACHE);
+        let conf_path = home.join(SAVE_FILE);
         std::fs::write(&conf_path, serde_json::to_string(self).unwrap()).unwrap();
     }
 }
