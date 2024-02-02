@@ -24,4 +24,17 @@ pub mod util {
             }
         }
     }
+
+    pub async fn start_tcp_echo_server(addr: &str) -> anyhow::Result<()> {
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+        loop {
+            let (mut socket, _) = listener.accept().await?;
+            tokio::spawn(async move {
+                let (mut reader, mut writer) = socket.split();
+                if let Err(e) = tokio::io::copy(&mut reader, &mut writer).await {
+                    log::error!("failed to copy: {}", e);
+                }
+            });
+        }
+    }
 }
