@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use std::sync::{atomic::{AtomicUsize, AtomicU64}, Arc};
+
 use eframe::{egui, Storage};
 
 const SAVE_KEY: &str = "tiny_portal_gui.save";
@@ -8,7 +10,7 @@ fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
+        viewport: egui::ViewportBuilder::default().with_resizable(true),
         ..Default::default()
     };
 
@@ -53,25 +55,26 @@ struct MyApp {
     stop_portal: Option<tokio::task::JoinHandle<()>>,
     #[serde(skip)]
     rt: AsyncRuntime,
+    #[serde(skip)]
+    conn_cnt: Option<Arc<AtomicU64>>,
 }
 
 impl MyApp {
     fn start(&mut self) {
-        let src_addr = self.src_addr.clone();
-        let dst_addr = self.dst_addr.clone();
-        let protocol = self.protocol;
+        if self.protocol == Protocol::TCP {
+            let p = tiny_portal::TcpPortForwarder::new(&self.src_addr, &self.dst_addr);
+            self.conn_cnt.replace(p.get_conn_cnt());
+            self.start_portal(p);
+        } else {
+            let p = tiny_portal::UdpPortForwarder::new(&self.src_addr, &self.dst_addr);
+            self.conn_cnt.replace(p.get_conn_cnt());
+            self.start_portal(p);
+        };
+    }
 
+    fn start_portal(&mut self, p: impl tiny_portal::Portal + Send + 'static) {
         let j = self.rt.0.spawn(async move {
-            let res = if protocol == Protocol::TCP {
-                tiny_portal::TcpPortForwarder::new(&src_addr, &dst_addr)
-                    .start()
-                    .await
-            } else {
-                tiny_portal::UdpPortForwarder::new(&src_addr, &dst_addr)
-                    .start()
-                    .await
-            };
-
+            let res = p.start().await;
             if let Err(e) = res {
                 log::error!("Port forwarder stopped: {:?}", e);
             } else {
@@ -89,6 +92,14 @@ impl MyApp {
             }
         }
         self.stop_portal.is_some()
+    }
+
+    fn stop(&mut self) {
+        if let Some(f) = self.stop_portal.take() {
+            log::info!("Stopping port forwarder");
+            f.abort();
+            self.conn_cnt = None
+        }
     }
 }
 
@@ -129,13 +140,21 @@ impl eframe::App for MyApp {
                 let btn = ui.button(if !busy { "Start" } else { "Stop" });
 
                 if btn.clicked() {
-                    if let Some(f) = self.stop_portal.take() {
+                    if self.stop_portal.is_some() {
                         log::info!("Stopping port forwarder");
-                        f.abort();
+                        self.stop();
                     } else {
                         log::info!("Starting port forwarder");
                         self.start();
                     }
+                }
+
+                if let Some(cnt) = &self.conn_cnt {
+                    ui.separator();
+                    ui.label(format!(
+                        "Connections: {}",
+                        cnt.load(std::sync::atomic::Ordering::Relaxed)
+                    ));
                 }
             });
         });

@@ -4,8 +4,7 @@ mod udp;
 pub use udp::*;
 
 pub trait Portal {
-    async fn start(&self) -> anyhow::Result<()>;
-    fn status(&self) -> String;
+    fn start(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
 }
 
 pub mod util {

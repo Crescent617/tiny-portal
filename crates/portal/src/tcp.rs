@@ -40,18 +40,16 @@ impl TcpPortForwarder {
             }
         }
     }
+
+    pub fn get_conn_cnt(&self) -> Arc<std::sync::atomic::AtomicU64> {
+        return self.conn_cnt.clone();
+    }
+
 }
 
 impl super::Portal for TcpPortForwarder {
     async fn start(&self) -> anyhow::Result<()> {
         self.start().await
-    }
-
-    fn status(&self) -> String {
-        format!(
-            "{} connections",
-            self.conn_cnt.load(std::sync::atomic::Ordering::Relaxed)
-        )
     }
 }
 

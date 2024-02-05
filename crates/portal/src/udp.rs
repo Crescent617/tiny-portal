@@ -73,7 +73,7 @@ pub struct UdpPortForwarder {
     pub src: String,
     pub dst: String,
     conns: Arc<Mutex<HashMap<SocketAddr, UdpConn>>>,
-    conn_cnt: Arc<std::sync::atomic::AtomicUsize>,
+    conn_cnt: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl std::fmt::Display for UdpPortForwarder {
@@ -90,6 +90,10 @@ impl UdpPortForwarder {
             conns: Arc::new(Mutex::new(HashMap::new())),
             conn_cnt: Arc::new(0.into()),
         }
+    }
+
+    pub fn get_conn_cnt(&self) -> Arc<std::sync::atomic::AtomicU64> {
+        return self.conn_cnt.clone();
     }
 
     async fn cleanup(conns: Arc<Mutex<HashMap<SocketAddr, UdpConn>>>, timeout: Duration) -> usize {
@@ -117,7 +121,7 @@ impl UdpPortForwarder {
             loop {
                 tokio::time::sleep(UDP_CHECK_INTERVAL).await;
                 let n = conns.lock().await.len();
-                conn_cnt.store(n, std::sync::atomic::Ordering::Relaxed);
+                conn_cnt.store(n as u64, std::sync::atomic::Ordering::Relaxed);
                 let k = Self::cleanup(conns.clone(), DEFAULT_UDP_TIMEOUT).await;
                 log::debug!("Cleaned up {}/{} connections", k, n);
             }
@@ -152,6 +156,8 @@ impl UdpPortForwarder {
                                 dst_addr
                             );
                             let conn = UdpConn::new(client_addr, dst_addr, sock.clone()).await?;
+                            self.conn_cnt
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             e.insert(conn).send(&b1[..size]).await?;
                         }
                     }
@@ -165,13 +171,6 @@ impl UdpPortForwarder {
 impl super::Portal for UdpPortForwarder {
     async fn start(&self) -> anyhow::Result<()> {
         self.start().await
-    }
-
-    fn status(&self) -> String {
-        format!(
-            "{} connections",
-            self.conn_cnt.load(std::sync::atomic::Ordering::Relaxed)
-        )
     }
 }
 

@@ -1,5 +1,5 @@
 OUT_DIR = bin
-VERSION = 0.1.0
+VERSION = 0.1.1
 BIN_NAME = tiny-portal-gui
 WIN_BIN = $(OUT_DIR)/$(BIN_NAME)-x86_64-pc-windows-gnu.exe
 
