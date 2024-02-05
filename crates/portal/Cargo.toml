@@ -11,3 +11,4 @@ log = "0.4.20"
 smallstr = "0.3.0"
 smol_str = "0.2.1"
 tokio = { version = "1", features = ["full"] }
+scopeguard = "1.2.0"

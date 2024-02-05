@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 
@@ -5,6 +7,7 @@ use tokio::net::{TcpListener, TcpStream};
 pub struct TcpPortForwarder {
     pub src: String,
     pub dst: String,
+    conn_cnt: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl std::fmt::Display for TcpPortForwarder {
@@ -18,6 +21,7 @@ impl TcpPortForwarder {
         Self {
             src: src.to_string(),
             dst: dst.to_string(),
+            conn_cnt: Arc::new(0.into()),
         }
     }
 
@@ -30,7 +34,7 @@ impl TcpPortForwarder {
             match listener.accept().await {
                 Ok((client, _)) => {
                     log::debug!("Accepted connection from {}", client.peer_addr()?);
-                    tokio::spawn(handle_tcp(client, self.dst.clone()));
+                    tokio::spawn(handle_tcp(client, self.dst.clone(), self.conn_cnt.clone()));
                 }
                 Err(e) => log::error!("Error accepting connection: {}", e),
             }
@@ -38,10 +42,29 @@ impl TcpPortForwarder {
     }
 }
 
+impl super::Portal for TcpPortForwarder {
+    async fn start(&self) -> anyhow::Result<()> {
+        self.start().await
+    }
+
+    fn status(&self) -> String {
+        format!(
+            "{} connections",
+            self.conn_cnt.load(std::sync::atomic::Ordering::Relaxed)
+        )
+    }
+}
+
 async fn handle_tcp(
     client: TcpStream,
     target_addr: impl tokio::net::ToSocketAddrs,
+    cnt: Arc<std::sync::atomic::AtomicU64>,
 ) -> io::Result<()> {
+    cnt.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    scopeguard::defer! {
+        cnt.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+    };
+
     match TcpStream::connect(target_addr).await {
         Ok(target) => {
             let (mut cr, mut cw) = client.into_split();

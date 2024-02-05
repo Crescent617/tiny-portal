@@ -73,6 +73,7 @@ pub struct UdpPortForwarder {
     pub src: String,
     pub dst: String,
     conns: Arc<Mutex<HashMap<SocketAddr, UdpConn>>>,
+    conn_cnt: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl std::fmt::Display for UdpPortForwarder {
@@ -87,6 +88,7 @@ impl UdpPortForwarder {
             src: src.to_string(),
             dst: dst.to_string(),
             conns: Arc::new(Mutex::new(HashMap::new())),
+            conn_cnt: Arc::new(0.into()),
         }
     }
 
@@ -108,11 +110,14 @@ impl UdpPortForwarder {
         log::info!("Running {}", self);
 
         let conns = self.conns.clone();
+        let conn_cnt = self.conn_cnt.clone();
+
         let _cleanup_drop_guard = TaskDropGuard(tokio::spawn(async move {
             log::info!("Starting cleanup task");
             loop {
                 tokio::time::sleep(UDP_CHECK_INTERVAL).await;
                 let n = conns.lock().await.len();
+                conn_cnt.store(n, std::sync::atomic::Ordering::Relaxed);
                 let k = Self::cleanup(conns.clone(), DEFAULT_UDP_TIMEOUT).await;
                 log::debug!("Cleaned up {}/{} connections", k, n);
             }
@@ -154,6 +159,19 @@ impl UdpPortForwarder {
                 Err(e) => log::error!("Error receiving from socket: {}", e),
             }
         }
+    }
+}
+
+impl super::Portal for UdpPortForwarder {
+    async fn start(&self) -> anyhow::Result<()> {
+        self.start().await
+    }
+
+    fn status(&self) -> String {
+        format!(
+            "{} connections",
+            self.conn_cnt.load(std::sync::atomic::Ordering::Relaxed)
+        )
     }
 }
 

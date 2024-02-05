@@ -1,32 +1,31 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use eframe::egui;
+use eframe::{egui, Storage};
 
-const SAVE_FILE: &str = ".tiny_portal_gui.save.json";
+const SAVE_KEY: &str = "tiny_portal_gui.save";
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
         ..Default::default()
-    };
-    let home = dirs::home_dir().unwrap();
-    let conf_path = home.join(SAVE_FILE);
-    let app = if conf_path.exists() {
-        let conf = std::fs::read_to_string(&conf_path).unwrap();
-        let app: MyApp = serde_json::from_str(&conf).unwrap();
-        app
-    } else {
-        MyApp::default()
     };
 
     eframe::run_native(
         "Tiny Portal GUI",
         options,
-        Box::new(|_| {
+        Box::new(|cc| {
             // This gives us image support:
             // egui_extras::install_image_loaders(&cc.egui_ctx);
-            Box::new(app)
+            if let Some(s) = cc.storage {
+                if let Some(s) = s.get_string(SAVE_KEY) {
+                    if let Ok(app) = ron::from_str::<MyApp>(&s) {
+                        return Box::new(app);
+                    }
+                }
+            }
+            Box::new(MyApp::default())
         }),
     )
 }
@@ -94,6 +93,11 @@ impl MyApp {
 }
 
 impl eframe::App for MyApp {
+    fn save(&mut self, storage: &mut dyn Storage) {
+        log::info!("Saving state");
+        storage.set_string(SAVE_KEY, ron::to_string(self).unwrap());
+    }
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let busy = self.is_busy();
 
@@ -135,16 +139,5 @@ impl eframe::App for MyApp {
                 }
             });
         });
-    }
-}
-
-impl Drop for MyApp {
-    fn drop(&mut self) {
-        if let Some(j) = self.stop_portal.take() {
-            j.abort();
-        }
-        let home = dirs::home_dir().unwrap();
-        let conf_path = home.join(SAVE_FILE);
-        std::fs::write(&conf_path, serde_json::to_string(self).unwrap()).unwrap();
     }
 }

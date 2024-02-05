@@ -3,6 +3,11 @@ pub use tcp::*;
 mod udp;
 pub use udp::*;
 
+pub trait Portal {
+    async fn start(&self) -> anyhow::Result<()>;
+    fn status(&self) -> String;
+}
+
 pub mod util {
     use std::sync::Arc;
 
