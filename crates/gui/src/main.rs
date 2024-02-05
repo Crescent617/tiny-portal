@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::sync::{atomic::{AtomicUsize, AtomicU64}, Arc};
+use std::sync::{atomic::AtomicU64, Arc};
 
 use eframe::{egui, Storage};
 
@@ -10,7 +10,7 @@ fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_resizable(true),
+        viewport: egui::ViewportBuilder::default(),
         ..Default::default()
     };
 

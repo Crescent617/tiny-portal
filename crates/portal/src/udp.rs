@@ -23,7 +23,14 @@ impl UdpConn {
         dst_addr: SocketAddr,
         server_sock: Arc<UdpSocket>,
     ) -> anyhow::Result<Self> {
-        let forward_sock = Arc::new(UdpSocket::bind("0.0.0.0:0").await?);
+        let forward_sock = Arc::new(
+            UdpSocket::bind(if dst_addr.is_ipv6() {
+                "[::]:0"
+            } else {
+                "0.0.0.0:0"
+            })
+            .await?,
+        );
         forward_sock.connect(dst_addr).await?;
 
         let last_activity = Arc::new(Mutex::new(std::time::Instant::now()));
