@@ -97,7 +97,6 @@ impl MyApp {
 
     fn stop(&mut self) {
         if let Some(f) = self.stop_portal.take() {
-            log::info!("Stopping port forwarder");
             f.abort();
             self.conn_cnt = None
         }
