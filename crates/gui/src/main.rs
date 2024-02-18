@@ -90,6 +90,7 @@ impl MyApp {
         if let Some(j) = &self.stop_portal {
             if j.is_finished() {
                 self.stop_portal = None;
+                self.conn_cnt = None;
             }
         }
         self.stop_portal.is_some()

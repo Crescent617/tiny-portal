@@ -20,17 +20,10 @@ struct UdpConn {
 impl UdpConn {
     async fn new(
         client_addr: SocketAddr,
-        dst_addr: SocketAddr,
+        dst_addr: &str,
         server_sock: Arc<UdpSocket>,
     ) -> anyhow::Result<Self> {
-        let forward_sock = Arc::new(
-            UdpSocket::bind(if dst_addr.is_ipv6() {
-                "[::]:0"
-            } else {
-                "0.0.0.0:0"
-            })
-            .await?,
-        );
+        let forward_sock = Arc::new(UdpSocket::bind("[::]:0").await?);
         forward_sock.connect(dst_addr).await?;
 
         let last_activity = Arc::new(Mutex::new(std::time::Instant::now()));
@@ -135,9 +128,9 @@ impl UdpPortForwarder {
         }));
 
         let sock = Arc::new(UdpSocket::bind(&self.src).await?);
-        let dst_addr: SocketAddr = self.dst.parse()?;
 
         let mut b1 = [0u8; MAX_UDP_PACKET_SIZE];
+        let dst_addr = &self.dst;
 
         loop {
             let sock = sock.clone();
