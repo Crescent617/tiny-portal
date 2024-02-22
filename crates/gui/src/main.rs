@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use once_cell::sync::OnceCell;
 use std::sync::{atomic::AtomicU64, Arc};
 
 use eframe::{egui, Storage};
@@ -33,11 +34,9 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
-struct AsyncRuntime(tokio::runtime::Runtime);
-impl Default for AsyncRuntime {
-    fn default() -> Self {
-        Self(tokio::runtime::Runtime::new().unwrap())
-    }
+fn global_rt() -> &'static tokio::runtime::Runtime {
+    static RT: OnceCell<tokio::runtime::Runtime> = OnceCell::new();
+    RT.get_or_init(|| tokio::runtime::Runtime::new().unwrap())
 }
 
 #[derive(PartialEq, Clone, Copy, serde::Deserialize, serde::Serialize, Default)]
@@ -54,8 +53,6 @@ struct MyApp {
     protocol: Protocol,
     #[serde(skip)]
     stop_portal: Option<tokio::task::JoinHandle<()>>,
-    #[serde(skip)]
-    rt: AsyncRuntime,
     #[serde(skip)]
     conn_cnt: Option<Arc<AtomicU64>>,
 }
@@ -74,7 +71,7 @@ impl MyApp {
     }
 
     fn start_portal(&mut self, p: impl tiny_portal::Portal + Send + 'static) {
-        let j = self.rt.0.spawn(async move {
+        let j = global_rt().spawn(async move {
             let res = p.start().await;
             if let Err(e) = res {
                 log::error!("Port forwarder stopped: {:?}", e);
